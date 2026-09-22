@@ -5,6 +5,7 @@ import org.example.entity.User;
 import org.example.service.UserService;
 import org.springframework.web.bind.annotation.*;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import org.example.common.Result;
 
 import java.util.List;
 
@@ -16,38 +17,39 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/search")
-    public List<User> search(@RequestParam String name) {
+    public Result<List<User>> search(@RequestParam String name) {
         QueryWrapper<User> wrapper = new QueryWrapper<>();
         wrapper.like("name", name);
-        return userService.list(wrapper);
+        return Result.success(userService.list(wrapper));
     }
 
 
     @PostMapping
-    public User create(@RequestBody User user) {
+    public Result<User> create(@RequestBody User user) {
         userService.save(user);
-        return user;
+        return Result.success(user);
     }
 
     @GetMapping("/{id}")
-    public User getById(@PathVariable Integer id) {
-        return userService.getById(id);
+    public Result<User> getById(@PathVariable Integer id) {
+        return Result.success(userService.getById(id));
     }
 
     @GetMapping
-    public List<User> list() {
-        return userService.list();
+    public Result<List<User>> list() {
+        return Result.success(userService.list());
     }
 
     @PutMapping
-    public User update(@RequestBody User user) {
+    public Result<User> update(@RequestBody User user) {
         userService.updateById(user);
-        return user;
+        return Result.success(user);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Integer id) {
+    public Result<Void> delete(@PathVariable Integer id) {
         userService.removeById(id);
+        return Result.success();
     }
 }
 
