@@ -6,12 +6,12 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 @Data
-@TableName("user")
-public class User {
-
+@TableName("words")
+public class Word {
     @TableId(type = IdType.AUTO)
     private Integer id;
-
-    private String name;
+    private  String text;
+    private String meaning;
+    private String tag;
+    private Integer frequency;
 }
-
