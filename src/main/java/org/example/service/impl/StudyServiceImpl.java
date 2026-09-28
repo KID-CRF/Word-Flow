@@ -16,6 +16,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.Objects;
+
 @Service
 @RequiredArgsConstructor
 public class StudyServiceImpl
@@ -39,14 +43,28 @@ public class StudyServiceImpl
         return session;
     }
 
-    @Override
+
     @Transactional
-    public void submitAnswer(Integer userId, Integer sessionId, Integer wordId, String action, Integer latencyMs) {
+    @Override
+    public void submitAnswer(Integer userId, Integer sessionId, Integer wordId, Integer round, String action, Integer latencyMs) {
+
+        // 幂等判断
+        long count = answerEventService.count(
+                new QueryWrapper<AnswerEvent>()
+                        .eq("session_id", sessionId)
+                        .eq("word_id", wordId)
+                        .eq("round", round)
+        );
+        if (count > 0) {
+            return;
+        }
+
         // 1. 写入答题事件
         AnswerEvent event = new AnswerEvent();
         event.setUserId(userId);
         event.setSessionId(sessionId);
         event.setWordId(wordId);
+        event.setRound(round);
         event.setAction(action);
         event.setLatencyMs(latencyMs);
         event.setCreatedAt(LocalDateTime.now());
@@ -63,9 +81,9 @@ public class StudyServiceImpl
             state = new UserWordState();
             state.setUserId(userId);
             state.setWordId(wordId);
+            state.setRounds(0);
             state.setCorrectCount(0);
             state.setWrongCount(0);
-            state.setRounds(0);
             state.setLevel(0);
             state.setIsMastered(0);
         }
@@ -110,22 +128,51 @@ public class StudyServiceImpl
         return session;
     }
 
+    private double computeScore(UserWordState s) {
+        double wWrong = 2.0;    // 错误权重
+        double wRounds = 1.0;   // 轮次权重
+        double wCorrect = 0.5;  // 正确权重
+        double wTime = 0.5;     // 时间衰减
+
+        long days = s.getLastSeenAt() == null ? 0 :
+                ChronoUnit.DAYS.between(s.getLastSeenAt(), LocalDateTime.now());
+
+        int correct = s.getCorrectCount() == null ? 0 : s.getCorrectCount();
+        int wrong = s.getWrongCount() == null ? 0 : s.getWrongCount();
+        int rounds = s.getRounds() == null ? 0 : s.getRounds();
+
+        return wWrong * wrong
+                + wRounds * rounds
+                - wCorrect * correct
+                - wTime * days;
+    }
+
     @Override
     public List<Word> getNextGroup(Integer userId, Integer sessionId) {
-        // 先简单实现：返回所有未掌握的单词
         List<UserWordState> states = userWordStateService.list(
                 new QueryWrapper<UserWordState>()
                         .eq("user_id", userId)
                         .eq("is_mastered", 0)
         );
 
-        //待补充下一组排序逻辑
+        // 按公式降序排序
+        states.sort((a, b) -> Double.compare(computeScore(b), computeScore(a)));
+
+        // 取前 10 个
         List<Integer> wordIds = states.stream()
+                .limit(10)
                 .map(UserWordState::getWordId)
                 .collect(Collectors.toList());
 
         if (wordIds.isEmpty()) return List.of();
 
-        return wordService.listByIds(wordIds);
+        // 查出单词并按 wordIds 顺序重排
+        List<Word> words = wordService.listByIds(wordIds);
+        Map<Integer, Word> map = words.stream()
+                .collect(Collectors.toMap(Word::getId, w -> w));
+        return wordIds.stream()
+                .map(map::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }

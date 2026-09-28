@@ -21,14 +21,16 @@ public class StudyController {
         return Result.success(studyService.startStudy(userId));
     }
 
+
     @PostMapping("/answer")
     public Result<Void> answer(
             @RequestParam Integer userId,
             @RequestParam Integer sessionId,
             @RequestParam Integer wordId,
+            @RequestParam Integer round,
             @RequestParam String action,
             @RequestParam(required = false) Integer latencyMs) {
-        studyService.submitAnswer(userId, sessionId, wordId, action, latencyMs);
+        studyService.submitAnswer(userId, sessionId, wordId, round, action, latencyMs);
         return Result.success();
     }
 

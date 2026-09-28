@@ -3,6 +3,7 @@ package org.example.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.example.entity.StudySession;
 import org.example.entity.Word;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -12,7 +13,8 @@ public interface StudyService extends IService<StudySession> {
     StudySession startStudy(Integer userId);
 
     // 提交答题
-    void submitAnswer(Integer userId, Integer sessionId, Integer wordId, String action, Integer latencyMs);
+    void submitAnswer(Integer userId, Integer sessionId, Integer wordId, Integer round, String action, Integer latencyMs);
+
 
     // 结束学习，返回统计
     StudySession endStudy(Integer sessionId);
