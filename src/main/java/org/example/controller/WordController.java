@@ -10,6 +10,10 @@ import org.example.common.Result;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import java.util.concurrent.TimeUnit;
+
 @RestController
 @RequestMapping("/words")
 @RequiredArgsConstructor
@@ -77,11 +81,36 @@ public class WordController {
     }
 
     // 按频率排序取前 N
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
     @GetMapping("/top")
     public Result<List<Word>> getTop(@RequestParam(defaultValue = "10") Integer limit) {
+        String key = "word:top:" + limit;
+
+        // 1. 查 Redis
+        try {
+            Object cached = redisTemplate.opsForValue().get(key);
+            if (cached != null) {
+                return Result.success((List<Word>) cached);
+            }
+        } catch (Exception e) {
+            System.out.println("Redis 查询失败：" + e.getMessage());
+        }
+
+        // 2. 查 MySQL
         QueryWrapper<Word> wrapper = new QueryWrapper<>();
         wrapper.orderByDesc("frequency");
         wrapper.last("LIMIT " + limit);
-        return Result.success(wordService.list(wrapper));
+        List<Word> words = wordService.list(wrapper);
+
+        // 3. 写回 Redis
+        try {
+            redisTemplate.opsForValue().set(key, words, 1, TimeUnit.HOURS);
+        } catch (Exception e) {
+            System.out.println("Redis 写入失败：" + e.getMessage());
+        }
+
+        return Result.success(words);
     }
 }
